@@ -18,6 +18,15 @@
                 >
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
+        
+        <action id="dev.zerr.lmpactions.LmpCopyWithInstructionAction"
+                class="dev.zerr.lmpactions.LmpCopyWithInstructionAction"
+                text="Copy as LMP - Edit instruction"
+                description="Copy selected files or folders as LMP format with custom instruction"
+                popup="true"
+                >
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">
