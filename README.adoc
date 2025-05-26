@@ -1,0 +1,52 @@
+= LMP Actions for IntelliJ IDEA
+:toc:
+:icons: font
+
+This project is an IntelliJ IDEA plugin that replicates the functionality of the "LMP Actions" VSCode extension. It allows users to extract, copy, and parse lumped files (LMP) directly from the IDE, providing advanced code sharing and AI workflow integration.
+
+== Features
+
+* Extract files from LMP-formatted text into the project directory.
+* Copy files or directories as LMP format, preserving file paths and structure.
+* Smart exclusion of files and directories (e.g., binaries, ignored files, large files, .gitignore support).
+* Customizable exclusion patterns and extensions.
+* Token count estimation for AI usage.
+* Real-time notifications and feedback.
+* Seamless integration with the IntelliJ UI (context menu, tool window, actions).
+* AsciiDoc documentation output for all guides and manuals.
+
+== Getting Started
+
+. Clone this repository or use the IntelliJ Platform Plugin Template.
+. Open the project in IntelliJ IDEA (Community or Ultimate).
+. Build and run the plugin using Gradle tasks.
+. Access LMP Actions via the right-click context menu or the dedicated tool window.
+
+== Usage
+
+* **Copy as LMP**: Right-click a file or directory and select 'Copy as LMP' to copy the selected content in LMP format to the clipboard.
+* **Extract LMP**: Open the LMP Actions tool window, paste your LMP content, select the target directory, and extract the files.
+* **Configure Exclusions**: Use the plugin settings to customize excluded patterns and extensions.
+
+== Plugin Structure
+
+* `src/main/java/com/example/lmpactions/`
+** `LmpActionsToolWindowFactory.java` — Registers the tool window.
+** `LmpExtractAction.java` — Extracts LMP files to the project.
+** `LmpCopyAction.java` — Copies files/directories as LMP.
+** `LmpOperator.java` — Core logic for parsing and generating LMP.
+* `resources/META-INF/plugin.xml` — Plugin configuration and action registration.
+* `build.gradle.kts` — Gradle build script.
+* `README.adoc` — This documentation.
+
+== Development
+
+This plugin is based on the IntelliJ Platform Plugin Template. For details, see:
+
+* https://plugins.jetbrains.com/docs/intellij/developing-plugins.html
+* https://github.com/JetBrains/intellij-platform-plugin-template
+
+== License
+
+MIT License.
+
