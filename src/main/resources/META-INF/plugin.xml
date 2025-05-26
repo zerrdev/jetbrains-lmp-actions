@@ -10,14 +10,6 @@
     <depends>com.intellij.modules.platform</depends>
 
     <actions>
-        <action id="dev.zerr.lmpactions.LmpExtractAction"
-                class="dev.zerr.lmpactions.LmpExtractAction"
-                text="Extract LMP from Clipboard"
-                description="Extracts files from LMP format in clipboard to project root"
-                popup="true"
-                >
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-        </action>
         <action id="dev.zerr.lmpactions.LmpCopyAction"
                 class="dev.zerr.lmpactions.LmpCopyAction"
                 text="Copy as LMP"
