@@ -54,7 +54,6 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
         
         // Main content with vertical split
         JBSplitter mainSplitter = new JBSplitter(true, 0.7f);
-        // make mainSplitter grow
         mainSplitter.setPreferredSize(new Dimension(800, 600));
         mainSplitter.setFirstComponent(createInputPanel());
         mainSplitter.setSecondComponent(createBottomPanel());
@@ -174,22 +173,28 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
 
     private JPanel createBottomPanel() {
         JPanel bottomPanel = new JPanel(new BorderLayout());
-        // make bottomPanel grow
-        bottomPanel.setPreferredSize(new Dimension(0, 200));
+        bottomPanel.setPreferredSize(new Dimension(0, 120));
+        bottomPanel.setBorder(JBUI.Borders.emptyTop(8));
         
-        // Directory and extract section
-        JPanel extractPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        // make extractPanel grow
-        extractPanel.setPreferredSize(new Dimension(0, 60));
-        extractPanel.setBorder(JBUI.Borders.emptyTop(4));
+        // Directory selection panel
+        JPanel dirPanel = new JPanel(new BorderLayout());
+        dirPanel.setBorder(JBUI.Borders.emptyBottom(8));
         
         JLabel dirLabel = new JLabel("Output Directory:");
         dirLabel.setBorder(JBUI.Borders.emptyRight(8));
         
-        JTextField outputDir = new JTextField(project.getBasePath(), 25);
+        JTextField outputDir = new JTextField(project.getBasePath());
+        outputDir.setPreferredSize(new Dimension(200, 25));
+        
+        dirPanel.add(dirLabel, BorderLayout.WEST);
+        dirPanel.add(outputDir, BorderLayout.CENTER);
+        
+        // Extract button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBorder(JBUI.Borders.emptyTop(4));
         
         JButton extractButton = new JButton("Extract LMP");
-        extractButton.setPreferredSize(JBUI.size(100, 28));
+        extractButton.setPreferredSize(JBUI.size(120, 32));
         
         JLabel statusLabel = new JLabel(" ");
         statusLabel.setBorder(JBUI.Borders.emptyLeft(8));
@@ -199,13 +204,11 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
             statusLabel.setText("Extraction functionality to be implemented");
         });
         
-        extractPanel.add(dirLabel);
-        extractPanel.add(outputDir);
-        extractPanel.add(Box.createHorizontalStrut(8));
-        extractPanel.add(extractButton);
-        extractPanel.add(statusLabel);
+        buttonPanel.add(extractButton);
+        buttonPanel.add(statusLabel);
         
-        bottomPanel.add(extractPanel, BorderLayout.NORTH);
+        bottomPanel.add(dirPanel, BorderLayout.NORTH);
+        bottomPanel.add(buttonPanel, BorderLayout.CENTER);
         
         return bottomPanel;
     }
