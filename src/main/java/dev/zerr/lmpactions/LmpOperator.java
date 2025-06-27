@@ -44,6 +44,25 @@ public class LmpOperator {
         return extractedFileCount;
     }
 
+    public List<String> parseFileList(String lmpContent) {
+        List<String> files = new ArrayList<>();
+        BufferedReader reader = new BufferedReader(new StringReader(lmpContent));
+        String line;
+        
+        try {
+            while ((line = reader.readLine()) != null) {
+                if (line.matches("^\\[FILE_START: .+]$")) {
+                    String filePath = line.replaceAll("^\\[FILE_START: (.+)]$", "$1").trim();
+                    files.add(filePath);
+                }
+            }
+        } catch (IOException e) {
+            // Should not happen with StringReader
+        }
+        
+        return files;
+    }
+
     public String copyFolderAsLmp(Path folderPath, List<String> excludeExtensions, List<Pattern> excludePatterns, Path relativeTo) throws IOException {
         StringBuilder lmpContent = new StringBuilder();
         List<Path> files = getAllFiles(folderPath, excludeExtensions, excludePatterns, relativeTo);

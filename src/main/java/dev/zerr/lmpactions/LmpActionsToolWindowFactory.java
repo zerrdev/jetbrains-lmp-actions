@@ -4,10 +4,18 @@ import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.*;
 import com.intellij.ui.content.*;
+import com.intellij.ui.treeStructure.Tree;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware {
     @Override
@@ -15,7 +23,7 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-// Área de texto com melhor aparência
+        // Área de texto com melhor aparência
         JTextArea lmpInput = new JTextArea(12, 80);
         lmpInput.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         lmpInput.setLineWrap(true);
@@ -25,11 +33,18 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
                 BorderFactory.createEmptyBorder(5, 5, 5, 5)
         ));
 
-// Campo de diretório com melhor layout
+        // Tree para mostrar arquivos
+        DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode("Files");
+        DefaultTreeModel treeModel = new DefaultTreeModel(rootNode);
+        Tree fileTree = new Tree(treeModel);
+        fileTree.setRootVisible(true);
+        fileTree.setShowsRootHandles(true);
+
+        // Campo de diretório com melhor layout
         JTextField outputDir = new JTextField(project.getBasePath(), 30);
         outputDir.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
 
-// Botões com melhor aparência
+        // Botões com melhor aparência
         JButton extractButton = new JButton("Extract LMP");
         extractButton.setPreferredSize(new Dimension(120, 30));
         extractButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
@@ -38,12 +53,30 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
         copyPromptButton.setPreferredSize(new Dimension(160, 30));
         copyPromptButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
 
-// Label de status com melhor visibilidade
+        // Label de status com melhor visibilidade
         JLabel statusLabel = new JLabel(" ");
         statusLabel.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 11));
         statusLabel.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
 
-// Lógica dos botões (mantida igual)
+        // Listener para atualizar a árvore quando o texto mudar
+        lmpInput.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateFileTree(lmpInput.getText(), treeModel, rootNode);
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateFileTree(lmpInput.getText(), treeModel, rootNode);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateFileTree(lmpInput.getText(), treeModel, rootNode);
+            }
+        });
+
+        // Lógica dos botões
         extractButton.addActionListener(e -> {
             String lmpText = lmpInput.getText();
             String dir = outputDir.getText();
@@ -90,21 +123,38 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
             statusLabel.setForeground(new Color(0, 120, 0));
         });
 
-// Panel superior com botão de prompt
+        // Panel superior com botão de prompt
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         topPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         topPanel.add(copyPromptButton);
 
-// Panel central com área de texto
+        // Panel central com área de texto e árvore lado a lado
         JPanel midPanel = new JPanel(new BorderLayout());
         midPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
+        
         JLabel inputLabel = new JLabel("Paste LMP content:");
         inputLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
         inputLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 5, 0));
         midPanel.add(inputLabel, BorderLayout.NORTH);
-        midPanel.add(new JScrollPane(lmpInput), BorderLayout.CENTER);
 
-// Panel de diretório com melhor espaçamento
+        // Split pane para dividir texto e árvore
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        splitPane.setLeftComponent(new JScrollPane(lmpInput));
+        
+        JPanel treePanel = new JPanel(new BorderLayout());
+        JLabel treeLabel = new JLabel("File Structure:");
+        treeLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
+        treeLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 5, 0));
+        treePanel.add(treeLabel, BorderLayout.NORTH);
+        treePanel.add(new JScrollPane(fileTree), BorderLayout.CENTER);
+        
+        splitPane.setRightComponent(treePanel);
+        splitPane.setDividerLocation(400);
+        splitPane.setResizeWeight(0.6);
+        
+        midPanel.add(splitPane, BorderLayout.CENTER);
+
+        // Panel de diretório com melhor espaçamento
         JPanel dirPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 5));
         dirPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         JLabel dirLabel = new JLabel("Output Directory:");
@@ -115,7 +165,7 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
         dirPanel.add(Box.createHorizontalStrut(10));
         dirPanel.add(extractButton);
 
-// Panel de status
+        // Panel de status
         JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         statusPanel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createEtchedBorder(),
@@ -123,7 +173,7 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
         ));
         statusPanel.add(statusLabel);
 
-// Montagem final do layout
+        // Montagem final do layout
         panel.add(topPanel, BorderLayout.NORTH);
         panel.add(midPanel, BorderLayout.CENTER);
         JPanel bottomPanel = new JPanel(new BorderLayout());
@@ -134,6 +184,55 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
         ContentFactory contentFactory = ContentFactory.getInstance();
         Content content = contentFactory.createContent(panel, "", false);
         toolWindow.getContentManager().addContent(content);
+    }
 
+    private void updateFileTree(String lmpContent, DefaultTreeModel treeModel, DefaultMutableTreeNode rootNode) {
+        SwingUtilities.invokeLater(() -> {
+            rootNode.removeAllChildren();
+            
+            if (lmpContent == null || lmpContent.trim().isEmpty()) {
+                treeModel.nodeStructureChanged(rootNode);
+                return;
+            }
+
+            try {
+                LmpOperator operator = new LmpOperator();
+                List<String> files = operator.parseFileList(lmpContent);
+                
+                // Criar estrutura hierárquica
+                Map<String, DefaultMutableTreeNode> nodeMap = new HashMap<>();
+                nodeMap.put("", rootNode);
+                
+                for (String filePath : files) {
+                    String[] parts = filePath.split("/");
+                    StringBuilder currentPath = new StringBuilder();
+                    DefaultMutableTreeNode currentNode = rootNode;
+                    
+                    for (int i = 0; i < parts.length; i++) {
+                        String part = parts[i];
+                        if (i > 0) {
+                            currentPath.append("/");
+                        }
+                        currentPath.append(part);
+                        String pathKey = currentPath.toString();
+                        
+                        if (!nodeMap.containsKey(pathKey)) {
+                            DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(part);
+                            currentNode.add(newNode);
+                            nodeMap.put(pathKey, newNode);
+                            currentNode = newNode;
+                        } else {
+                            currentNode = nodeMap.get(pathKey);
+                        }
+                    }
+                }
+                
+                treeModel.nodeStructureChanged(rootNode);
+                
+            } catch (Exception e) {
+                // Se houver erro no parsing, limpar a árvore
+                treeModel.nodeStructureChanged(rootNode);
+            }
+        });
     }
 }
