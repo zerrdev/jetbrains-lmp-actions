@@ -53,7 +53,9 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
         JPanel topPanel = createTopPanel();
         
         // Main content with vertical split
-        JBSplitter mainSplitter = new JBSplitter(true, 0.4f);
+        JBSplitter mainSplitter = new JBSplitter(true, 0.7f);
+        // make mainSplitter grow
+        mainSplitter.setPreferredSize(new Dimension(800, 600));
         mainSplitter.setFirstComponent(createInputPanel());
         mainSplitter.setSecondComponent(createBottomPanel());
 
@@ -133,8 +135,11 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
         });
 
         // Horizontal split for input and tree
-        JBSplitter inputSplitter = new JBSplitter(false, 0.6f);
-        inputSplitter.setFirstComponent(new JBScrollPane(lmpInput));
+        JBSplitter inputSplitter = new JBSplitter(true, 0.7f);
+        
+        JPanel textAreaPanel = new JPanel(new BorderLayout());
+        textAreaPanel.add(new JBScrollPane(lmpInput), BorderLayout.CENTER);
+        inputSplitter.setFirstComponent(textAreaPanel);
         
         JPanel treePanel = new JPanel(new BorderLayout());
         JLabel treeLabel = new JLabel("File Structure:");
@@ -169,9 +174,13 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
 
     private JPanel createBottomPanel() {
         JPanel bottomPanel = new JPanel(new BorderLayout());
+        // make bottomPanel grow
+        bottomPanel.setPreferredSize(new Dimension(0, 200));
         
         // Directory and extract section
-        JPanel extractPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel extractPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        // make extractPanel grow
+        extractPanel.setPreferredSize(new Dimension(0, 60));
         extractPanel.setBorder(JBUI.Borders.emptyTop(4));
         
         JLabel dirLabel = new JLabel("Output Directory:");
