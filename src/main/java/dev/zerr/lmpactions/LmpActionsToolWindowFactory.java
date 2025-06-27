@@ -1,101 +1,77 @@
 package dev.zerr.lmpactions;
 
+import com.intellij.diff.DiffContentFactory;
+import com.intellij.diff.DiffDialogHints;
+import com.intellij.diff.DiffManager;
+import com.intellij.diff.contents.DiffContent;
+import com.intellij.diff.requests.SimpleDiffRequest;
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.FileTypeRegistry;
+import com.intellij.openapi.fileTypes.UnknownFileType;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.*;
+import com.intellij.testFramework.LightVirtualFile;
+import com.intellij.ui.JBSplitter;
+import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.content.*;
 import com.intellij.ui.treeStructure.Tree;
+import com.intellij.util.ui.JBUI;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware {
+    
+    private Map<String, String> currentFileContents = new HashMap<>();
+    private Project project;
+    
     @Override
     public void createToolWindowContent(Project project, ToolWindow toolWindow) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        this.project = project;
+        
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBorder(JBUI.Borders.empty(8));
 
-        // Área de texto com melhor aparência
-        JTextArea lmpInput = new JTextArea(12, 80);
-        lmpInput.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        lmpInput.setLineWrap(true);
-        lmpInput.setWrapStyleWord(true);
-        lmpInput.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLoweredBevelBorder(),
-                BorderFactory.createEmptyBorder(5, 5, 5, 5)
-        ));
+        // Top panel with prompt button
+        JPanel topPanel = createTopPanel();
+        
+        // Main content with vertical split
+        JBSplitter mainSplitter = new JBSplitter(true, 0.4f);
+        mainSplitter.setFirstComponent(createInputPanel());
+        mainSplitter.setSecondComponent(createBottomPanel());
 
-        // Tree para mostrar arquivos
-        DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode("Files");
-        DefaultTreeModel treeModel = new DefaultTreeModel(rootNode);
-        Tree fileTree = new Tree(treeModel);
-        fileTree.setRootVisible(true);
-        fileTree.setShowsRootHandles(true);
+        mainPanel.add(topPanel, BorderLayout.NORTH);
+        mainPanel.add(mainSplitter, BorderLayout.CENTER);
 
-        // Campo de diretório com melhor layout
-        JTextField outputDir = new JTextField(project.getBasePath(), 30);
-        outputDir.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+        ContentFactory contentFactory = ContentFactory.getInstance();
+        Content content = contentFactory.createContent(mainPanel, "", false);
+        toolWindow.getContentManager().addContent(content);
+    }
 
-        // Botões com melhor aparência
-        JButton extractButton = new JButton("Extract LMP");
-        extractButton.setPreferredSize(new Dimension(120, 30));
-        extractButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
-
+    private JPanel createTopPanel() {
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        topPanel.setBorder(JBUI.Borders.emptyBottom(8));
+        
         JButton copyPromptButton = new JButton("Copy Create Prompt");
-        copyPromptButton.setPreferredSize(new Dimension(160, 30));
-        copyPromptButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
-
-        // Label de status com melhor visibilidade
-        JLabel statusLabel = new JLabel(" ");
-        statusLabel.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 11));
-        statusLabel.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
-
-        // Listener para atualizar a árvore quando o texto mudar
-        lmpInput.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                updateFileTree(lmpInput.getText(), treeModel, rootNode);
-            }
-
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                updateFileTree(lmpInput.getText(), treeModel, rootNode);
-            }
-
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                updateFileTree(lmpInput.getText(), treeModel, rootNode);
-            }
-        });
-
-        // Lógica dos botões
-        extractButton.addActionListener(e -> {
-            String lmpText = lmpInput.getText();
-            String dir = outputDir.getText();
-            if (lmpText.isEmpty() || dir.isEmpty()) {
-                statusLabel.setText("Please provide both LMP content and output directory.");
-                statusLabel.setForeground(Color.RED);
-                return;
-            }
-            try {
-                LmpOperator operator = new LmpOperator();
-                int count = operator.extract(lmpText, java.nio.file.Path.of(dir));
-                statusLabel.setText("Extracted " + count + " files.");
-                statusLabel.setForeground(new Color(0, 120, 0));
-            } catch (Exception ex) {
-                statusLabel.setText("Extraction failed: " + ex.getMessage());
-                statusLabel.setForeground(Color.RED);
-            }
-        });
-
+        copyPromptButton.setPreferredSize(JBUI.size(160, 28));
+        
         copyPromptButton.addActionListener(e -> {
             String createPrompt = """
             <rules>
@@ -119,76 +95,116 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
                 </instruction>
             """;
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(createPrompt), null);
-            statusLabel.setText("Prompt copied to clipboard.");
-            statusLabel.setForeground(new Color(0, 120, 0));
         });
-
-        // Panel superior com botão de prompt
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        topPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        
         topPanel.add(copyPromptButton);
+        return topPanel;
+    }
 
-        // Panel central com área de texto e árvore lado a lado
-        JPanel midPanel = new JPanel(new BorderLayout());
-        midPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
+    private JPanel createInputPanel() {
+        JPanel inputPanel = new JPanel(new BorderLayout());
+        inputPanel.setBorder(JBUI.Borders.emptyBottom(4));
         
         JLabel inputLabel = new JLabel("Paste LMP content:");
-        inputLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
-        inputLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 5, 0));
-        midPanel.add(inputLabel, BorderLayout.NORTH);
+        inputLabel.setBorder(JBUI.Borders.emptyBottom(4));
+        
+        JTextArea lmpInput = new JTextArea();
+        lmpInput.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        lmpInput.setLineWrap(true);
+        lmpInput.setWrapStyleWord(true);
+        lmpInput.setBorder(JBUI.Borders.empty(4));
 
-        // Split pane para dividir texto e árvore
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        splitPane.setLeftComponent(new JScrollPane(lmpInput));
+        // Tree for file structure
+        DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode("Files");
+        DefaultTreeModel treeModel = new DefaultTreeModel(rootNode);
+        Tree fileTree = new Tree(treeModel);
+        fileTree.setRootVisible(true);
+        fileTree.setShowsRootHandles(true);
+        
+        // Add click listener for file tree
+        fileTree.addTreeSelectionListener(e -> {
+            TreePath path = e.getPath();
+            if (path != null) {
+                String filePath = getFilePathFromTreePath(path);
+                if (filePath != null && currentFileContents.containsKey(filePath)) {
+                    handleFileClick(filePath);
+                }
+            }
+        });
+
+        // Horizontal split for input and tree
+        JBSplitter inputSplitter = new JBSplitter(false, 0.6f);
+        inputSplitter.setFirstComponent(new JBScrollPane(lmpInput));
         
         JPanel treePanel = new JPanel(new BorderLayout());
         JLabel treeLabel = new JLabel("File Structure:");
-        treeLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
-        treeLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 5, 0));
+        treeLabel.setBorder(JBUI.Borders.emptyBottom(4));
         treePanel.add(treeLabel, BorderLayout.NORTH);
-        treePanel.add(new JScrollPane(fileTree), BorderLayout.CENTER);
+        treePanel.add(new JBScrollPane(fileTree), BorderLayout.CENTER);
+        inputSplitter.setSecondComponent(treePanel);
+
+        // Document listener for real-time tree update
+        lmpInput.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateFileTree(lmpInput.getText(), treeModel, rootNode);
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateFileTree(lmpInput.getText(), treeModel, rootNode);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateFileTree(lmpInput.getText(), treeModel, rootNode);
+            }
+        });
+
+        inputPanel.add(inputLabel, BorderLayout.NORTH);
+        inputPanel.add(inputSplitter, BorderLayout.CENTER);
         
-        splitPane.setRightComponent(treePanel);
-        splitPane.setDividerLocation(400);
-        splitPane.setResizeWeight(0.6);
-        
-        midPanel.add(splitPane, BorderLayout.CENTER);
+        return inputPanel;
+    }
 
-        // Panel de diretório com melhor espaçamento
-        JPanel dirPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 5));
-        dirPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
-        JLabel dirLabel = new JLabel("Output Directory:");
-        dirLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
-        dirLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 10));
-        dirPanel.add(dirLabel);
-        dirPanel.add(outputDir);
-        dirPanel.add(Box.createHorizontalStrut(10));
-        dirPanel.add(extractButton);
-
-        // Panel de status
-        JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        statusPanel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(),
-                BorderFactory.createEmptyBorder(5, 10, 5, 10)
-        ));
-        statusPanel.add(statusLabel);
-
-        // Montagem final do layout
-        panel.add(topPanel, BorderLayout.NORTH);
-        panel.add(midPanel, BorderLayout.CENTER);
+    private JPanel createBottomPanel() {
         JPanel bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.add(dirPanel, BorderLayout.NORTH);
-        bottomPanel.add(statusPanel, BorderLayout.SOUTH);
-        panel.add(bottomPanel, BorderLayout.SOUTH);
-
-        ContentFactory contentFactory = ContentFactory.getInstance();
-        Content content = contentFactory.createContent(panel, "", false);
-        toolWindow.getContentManager().addContent(content);
+        
+        // Directory and extract section
+        JPanel extractPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        extractPanel.setBorder(JBUI.Borders.emptyTop(4));
+        
+        JLabel dirLabel = new JLabel("Output Directory:");
+        dirLabel.setBorder(JBUI.Borders.emptyRight(8));
+        
+        JTextField outputDir = new JTextField(project.getBasePath(), 25);
+        
+        JButton extractButton = new JButton("Extract LMP");
+        extractButton.setPreferredSize(JBUI.size(100, 28));
+        
+        JLabel statusLabel = new JLabel(" ");
+        statusLabel.setBorder(JBUI.Borders.emptyLeft(8));
+        
+        extractButton.addActionListener(e -> {
+            // Extract button logic would go here
+            statusLabel.setText("Extraction functionality to be implemented");
+        });
+        
+        extractPanel.add(dirLabel);
+        extractPanel.add(outputDir);
+        extractPanel.add(Box.createHorizontalStrut(8));
+        extractPanel.add(extractButton);
+        extractPanel.add(statusLabel);
+        
+        bottomPanel.add(extractPanel, BorderLayout.NORTH);
+        
+        return bottomPanel;
     }
 
     private void updateFileTree(String lmpContent, DefaultTreeModel treeModel, DefaultMutableTreeNode rootNode) {
         SwingUtilities.invokeLater(() -> {
             rootNode.removeAllChildren();
+            currentFileContents.clear();
             
             if (lmpContent == null || lmpContent.trim().isEmpty()) {
                 treeModel.nodeStructureChanged(rootNode);
@@ -198,8 +214,9 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
             try {
                 LmpOperator operator = new LmpOperator();
                 List<String> files = operator.parseFileList(lmpContent);
+                currentFileContents = operator.parseFileContents(lmpContent);
                 
-                // Criar estrutura hierárquica
+                // Create hierarchical structure
                 Map<String, DefaultMutableTreeNode> nodeMap = new HashMap<>();
                 nodeMap.put("", rootNode);
                 
@@ -230,9 +247,80 @@ public class LmpActionsToolWindowFactory implements ToolWindowFactory, DumbAware
                 treeModel.nodeStructureChanged(rootNode);
                 
             } catch (Exception e) {
-                // Se houver erro no parsing, limpar a árvore
                 treeModel.nodeStructureChanged(rootNode);
             }
         });
+    }
+
+    private String getFilePathFromTreePath(TreePath treePath) {
+        if (treePath.getPathCount() <= 1) {
+            return null; // Root node
+        }
+        
+        StringBuilder filePath = new StringBuilder();
+        for (int i = 1; i < treePath.getPathCount(); i++) {
+            if (i > 1) {
+                filePath.append("/");
+            }
+            filePath.append(treePath.getPathComponent(i).toString());
+        }
+        
+        String path = filePath.toString();
+        return currentFileContents.containsKey(path) ? path : null;
+    }
+
+    private void handleFileClick(String filePath) {
+        String lmpContent = currentFileContents.get(filePath);
+        if (lmpContent == null) return;
+        
+        // Check if file exists in project
+        Path projectPath = Paths.get(project.getBasePath());
+        Path fullFilePath = projectPath.resolve(filePath);
+        
+        if (Files.exists(fullFilePath)) {
+            // File exists - show diff
+            showDiffWithExistingFile(filePath, lmpContent, fullFilePath);
+        } else {
+            // File doesn't exist - show preview
+            showFilePreview(filePath, lmpContent);
+        }
+    }
+
+    private void showDiffWithExistingFile(String filePath, String lmpContent, Path existingFilePath) {
+        try {
+            String existingContent = Files.readString(existingFilePath);
+            
+            DiffContentFactory contentFactory = DiffContentFactory.getInstance();
+            DiffContent existingDiffContent = contentFactory.create(existingContent);
+            DiffContent lmpDiffContent = contentFactory.create(lmpContent);
+            
+            SimpleDiffRequest diffRequest = new SimpleDiffRequest(
+                "Compare: " + filePath,
+                existingDiffContent,
+                lmpDiffContent,
+                "Existing File",
+                "LMP Content"
+            );
+            
+            DiffManager.getInstance().showDiff(project, diffRequest, DiffDialogHints.DEFAULT);
+            
+        } catch (IOException e) {
+            showFilePreview(filePath, lmpContent);
+        }
+    }
+
+    private void showFilePreview(String filePath, String content) {
+        // Create a virtual file for preview
+        String fileName = Paths.get(filePath).getFileName().toString();
+        LightVirtualFile virtualFile = new LightVirtualFile(fileName, content);
+
+        // Let IntelliJ automatically detect the file type
+        FileType detectedFileType = FileTypeRegistry.getInstance().getFileTypeByFileName(fileName);
+        if (detectedFileType != UnknownFileType.INSTANCE) {
+            virtualFile.setFileType(detectedFileType);
+        }
+
+        // Open in editor
+        FileEditorManager.getInstance(project).openFile(virtualFile, true);
     }
 }

@@ -63,6 +63,41 @@ public class LmpOperator {
         return files;
     }
 
+    public Map<String, String> parseFileContents(String lmpContent) {
+        Map<String, String> fileContents = new HashMap<>();
+        BufferedReader reader = new BufferedReader(new StringReader(lmpContent));
+        String line;
+        boolean isReadingFile = false;
+        String currentFilePath = null;
+        StringBuilder currentFileContent = new StringBuilder();
+
+        try {
+            while ((line = reader.readLine()) != null) {
+                if (!isReadingFile && line.matches("^\\[FILE_START: .+]$")) {
+                    isReadingFile = true;
+                    currentFilePath = line.replaceAll("^\\[FILE_START: (.+)]$", "$1").trim();
+                    currentFileContent.setLength(0);
+                    continue;
+                }
+                if (isReadingFile && line.matches("^\\[FILE_END: .+]$")) {
+                    String foundFilePath = line.replaceAll("^\\[FILE_END: (.+)]$", "$1").trim();
+                    if (currentFilePath.equals(foundFilePath)) {
+                        fileContents.put(currentFilePath, currentFileContent.toString());
+                        isReadingFile = false;
+                    }
+                    continue;
+                }
+                if (isReadingFile) {
+                    currentFileContent.append(line).append('\n');
+                }
+            }
+        } catch (IOException e) {
+            // Should not happen with StringReader
+        }
+        
+        return fileContents;
+    }
+
     public String copyFolderAsLmp(Path folderPath, List<String> excludeExtensions, List<Pattern> excludePatterns, Path relativeTo) throws IOException {
         StringBuilder lmpContent = new StringBuilder();
         List<Path> files = getAllFiles(folderPath, excludeExtensions, excludePatterns, relativeTo);
